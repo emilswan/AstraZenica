@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l \"c:\\\\Users\\\\MuhammadSarwar\\\\CentralPharmaProjects\\\\cpaz-web\"/**/*.tsx \"c:\\\\Users\\\\MuhammadSarwar\\\\CentralPharmaProjects\\\\cpaz-web\"/**/*.ts)",
+      "Bash(dir \"c:\\\\Users\\\\MuhammadSarwar\\\\CentralPharmaProjects\\\\cpaz-web\\\\CascadeProjects\\\\windsurf-project\")"
+    ]
+  }
+}

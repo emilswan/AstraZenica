@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Plus, Search, Layers, CheckCircle, XCircle, Clock, RefreshCw,
-  ChevronDown, ChevronUp, FlaskConical, Calendar, Package, User,
+  FlaskConical, Calendar, Package, User,
   ArrowRight, Beaker, ClipboardList, AlertTriangle, Cpu, Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -46,72 +46,50 @@ function buildProtocol(product: Product | undefined, quantity: number, startDate
   ]
 }
 
-// ─── Batch Card ──────────────────────────────────────────────────────────────
-function BatchCard({ batch, selected, onClick }: { batch: Batch; selected: boolean; onClick: () => void }) {
-  const [open, setOpen] = useState(false)
+// ─── Batch Row (list item) ───────────────────────────────────────────────────
+function BatchRow({ batch, selected, onClick }: { batch: Batch; selected: boolean; onClick: () => void }) {
   const pct = batch.progress ?? 0
+  const barColor = statusColors[batch.status] || 'bg-gray-300'
 
   return (
-    <div className={cn('op-card overflow-hidden transition-all', selected && 'border-violet-400 shadow-sm shadow-violet-100')}>
-      <div className="px-3 py-2.5 cursor-pointer" onClick={onClick}>
-        <div className="flex items-center justify-between gap-2 mb-1.5">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="font-mono text-[10px] font-bold text-slate-400">{batch.batch_number}</span>
-            <BatchStatusBadge status={batch.status} />
-          </div>
-          <div className="text-right flex-shrink-0">
-            <span className="text-sm font-black text-slate-800">{formatNumber(batch.quantity)}</span>
-            <span className="text-[10px] text-slate-400 ml-0.5">{batch.product?.unit}</span>
-          </div>
+    <div
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-gray-50 last:border-0',
+        selected ? 'bg-violet-50/60' : 'hover:bg-gray-50/60'
+      )}
+    >
+      {/* Status dot */}
+      <div className={cn('h-2.5 w-2.5 rounded-full flex-shrink-0 mt-0.5', barColor)} />
+
+      {/* Main info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold text-slate-900 truncate">{batch.product?.name}</span>
+          <BatchStatusBadge status={batch.status} />
         </div>
-        <p className="text-xs font-bold text-slate-900 truncate">{batch.product?.name}</p>
+        <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400">
+          <span className="font-mono">{batch.batch_number}</span>
+          <span>{formatNumber(batch.quantity)} {batch.product?.unit}</span>
+          {batch.start_date && <span>{formatDate(batch.start_date)} → {formatDate(batch.end_date) || '?'}</span>}
+        </div>
+        {/* Progress bar */}
         <div className="flex items-center gap-2 mt-1.5">
-          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className={cn('h-full rounded-full transition-all', statusColors[batch.status] || 'bg-gray-300')} style={{ width: `${pct}%` }} />
+          <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+            <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pct}%` }} />
           </div>
-          <span className="text-[10px] font-bold text-slate-500 w-7 text-right">{pct}%</span>
-        </div>
-        <div className="grid grid-cols-2 gap-1 mt-1.5 text-[10px] text-slate-400">
-          <span>Start: <strong className="text-slate-600">{formatDate(batch.start_date) || '—'}</strong></span>
-          <span>End: <strong className="text-slate-600">{formatDate(batch.end_date) || '—'}</strong></span>
+          <span className="text-[10px] font-bold text-slate-400 w-7 text-right flex-shrink-0">{pct}%</span>
         </div>
       </div>
 
-      {/* Protocol toggle */}
-      <div className="border-t border-gray-100">
-        <button onClick={e => { e.stopPropagation(); setOpen(!open) }} className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-semibold text-slate-400 hover:bg-gray-50">
-          <span>Protocol Steps</span>
-          {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-        </button>
-        {open && (
-          <div className="px-3 pb-3">
-            {buildProtocol(batch.product, batch.quantity, batch.start_date || '', batch.end_date || '').map((step, idx, arr) => (
-              <div key={idx} className="flex gap-2.5">
-                <div className="flex flex-col items-center">
-                  <div className={cn('h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0',
-                    idx === 0 ? 'bg-violet-600 text-white' : idx === arr.length - 1 ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-slate-600')}>
-                    {step.day}
-                  </div>
-                  {idx < arr.length - 1 && <div className="w-px flex-1 bg-gray-100 mt-0.5" />}
-                </div>
-                <div className="flex-1 pb-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-700">{step.name}</span>
-                    <span className="text-[10px] text-slate-400">Day {step.day}</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{step.desc}</p>
-                  {step.items.map((it, i) => (
-                    <div key={i} className="flex justify-between text-[10px] mt-0.5">
-                      <span className="text-slate-500">{it.name}</span>
-                      <span className="text-slate-400 font-mono">{it.qty}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Operator avatar */}
+      {batch.operator?.full_name && (
+        <div className="h-7 w-7 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0" title={batch.operator.full_name}>
+          <span className="text-[10px] font-bold text-violet-600">
+            {batch.operator.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
@@ -493,15 +471,18 @@ export default function BatchBuildPage() {
               )}
             </div>
 
-            {/* Grid + Detail */}
+            {/* List + Detail */}
             <div className="flex gap-3">
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2">
-                {filtered.map(batch => (
-                  <BatchCard key={batch.id} batch={batch} selected={selected?.id === batch.id} onClick={() => setSelected(batch)} />
-                ))}
-                {filtered.length === 0 && (
-                  <div className="col-span-2 py-12 text-center text-slate-400 text-xs">
+              <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {filtered.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 text-xs">
                     <Layers className="h-8 w-8 mx-auto mb-1 opacity-20" />No batches found
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {filtered.map(batch => (
+                      <BatchRow key={batch.id} batch={batch} selected={selected?.id === batch.id} onClick={() => setSelected(batch)} />
+                    ))}
                   </div>
                 )}
               </div>

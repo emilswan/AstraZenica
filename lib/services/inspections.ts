@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { cached, cacheDel } from '@/lib/cache'
 import type { Inspection, InspectionType, InspectionStatus, Product, Profile } from '@/types'
+import * as mock from '@/lib/mock-services'
+const MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
 type ProductRow = Pick<Product, 'id' | 'sku' | 'name' | 'category'>
 type UserRow = Pick<Profile, 'id' | 'full_name' | 'email' | 'role'>
@@ -40,6 +42,7 @@ async function enrichInspections(rows: Inspection[]): Promise<Inspection[]> {
 }
 
 export async function getInspections(): Promise<Inspection[]> {
+  if (MOCK) return mock.getInspections()
   return cached('inspections', async () => {
     const { data, error } = await supabase
       .from('cpaz_inspections')
@@ -57,6 +60,7 @@ export async function createInspection(payload: {
   type: InspectionType
   findings?: string
 }): Promise<Inspection> {
+  if (MOCK) return mock.createInspection(payload)
   const { data, error } = await supabase
     .from('cpaz_inspections')
     .insert({ ...payload, status: 'pending', updated_at: new Date().toISOString() })
@@ -73,6 +77,7 @@ export async function updateInspection(id: string, payload: {
   findings?: string
   checked_at?: string
 }): Promise<void> {
+  if (MOCK) return mock.updateInspection(id, payload)
   const { error } = await supabase
     .from('cpaz_inspections')
     .update({ ...payload, updated_at: new Date().toISOString() })

@@ -8,7 +8,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { StatsCard } from '@/components/ui/StatsCard'
 import { formatDate, formatNumber, cn } from '@/lib/utils'
-import { getJITPlans, createJITPlan } from '@/lib/services/jit-plans'
+import { getJITPlans, createJITPlan, updateJITPlan } from '@/lib/services/jit-plans'
 import { getProducts } from '@/lib/services/products'
 import { cacheDel } from '@/lib/cache'
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay'
@@ -32,6 +32,10 @@ export default function JITPlanningPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [view, setView] = useState<'table' | 'cards'>('table')
   const [submitting, setSubmitting] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<JITPlan | null>(null)
+  const [showUpdateModal, setShowUpdateModal] = useState(false)
+  const [updateForm, setUpdateForm] = useState({ status: '', actual_quantity: '' })
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     product_id: '', planned_quantity: '', planned_date: '', notes: '',
@@ -98,6 +102,21 @@ export default function JITPlanningPage() {
     }
   }
 
+  const handleUpdate = async () => {
+    if (!selectedPlan) return
+    setUpdatingId(selectedPlan.id)
+    try {
+      const payload: { status?: JITPlan['status']; actual_quantity?: number } = {}
+      if (updateForm.status) payload.status = updateForm.status as JITPlan['status']
+      if (updateForm.actual_quantity) payload.actual_quantity = Number(updateForm.actual_quantity)
+      await updateJITPlan(selectedPlan.id, payload)
+      setPlans(prev => prev.map(p => p.id === selectedPlan.id ? { ...p, ...payload } : p))
+      toast.success('JIT Plan updated!')
+      setShowUpdateModal(false)
+    } catch { toast.error('Failed to update') }
+    finally { setUpdatingId(null) }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <LoadingOverlay visible={!!loadingMsg} message={loadingMsg} />
@@ -131,6 +150,9 @@ export default function JITPlanningPage() {
           <div className="sm:w-48">
             <Select options={[{ label: 'All Status', value: '' }, { label: 'Pending', value: 'pending' }, { label: 'In Progress', value: 'in_progress' }, { label: 'Completed', value: 'completed' }, { label: 'Cancelled', value: 'cancelled' }]} value={statusFilter} onChange={e => setStatusFilter(e.target.value)} placeholder="All Status" />
           </div>
+          {(search || statusFilter) && (
+            <Button variant="outline" size="sm" onClick={() => { setSearch(''); setStatusFilter('') }}>Clear</Button>
+          )}
         </div>
       </Card>
 
@@ -143,7 +165,7 @@ export default function JITPlanningPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {['Product', 'Planned Qty', 'Actual Qty', 'Planned Date', 'Status', 'Created By', 'Notes'].map(h => (
+                  {['Product', 'Planned Qty', 'Actual Qty', 'Planned Date', 'Status', 'Created By', 'Notes', ''].map(h => (
                     <th key={h} className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -165,7 +187,10 @@ export default function JITPlanningPage() {
                       <td className="py-3 px-4 text-slate-600">{formatDate(plan.planned_date)}</td>
                       <td className="py-3 px-4"><span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', cfg.color)}>{cfg.label}</span></td>
                       <td className="py-3 px-4 text-slate-600">{plan.creator?.full_name?.split(' ')[0] || '—'}</td>
-                      <td className="py-3 px-4 text-slate-500 max-w-xs truncate">{plan.notes || '—'}</td>
+                      <td className="py-3 px-4 text-slate-500 max-w-xs truncate" title={plan.notes || ''}>{plan.notes || '—'}</td>
+                      <td className="py-3 px-4">
+                        <button onClick={() => { setSelectedPlan(plan); setUpdateForm({ status: plan.status, actual_quantity: plan.actual_quantity?.toString() || '' }); setShowUpdateModal(true) }} className="text-xs text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap">Update</button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -209,6 +234,21 @@ export default function JITPlanningPage() {
           {filtered.length === 0 && <div className="col-span-3 text-center py-12 text-slate-400">No JIT plans found</div>}
         </div>
       )}
+
+      <Modal isOpen={showUpdateModal} onClose={() => setShowUpdateModal(false)} title="Update JIT Plan" size="sm"
+        footer={<><Button variant="outline" onClick={() => setShowUpdateModal(false)}>Cancel</Button><Button onClick={handleUpdate} disabled={!!updatingId}>{updatingId ? 'Saving…' : 'Save'}</Button></>}
+      >
+        {selectedPlan && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs text-slate-500 font-semibold mb-1">{selectedPlan.product?.name}</p>
+              <p className="text-xs text-slate-400">Planned: {formatNumber(selectedPlan.planned_quantity)} · {formatDate(selectedPlan.planned_date)}</p>
+            </div>
+            <Select label="Status" options={[{ label: 'Pending', value: 'pending' }, { label: 'In Progress', value: 'in_progress' }, { label: 'Completed', value: 'completed' }, { label: 'Cancelled', value: 'cancelled' }]} value={updateForm.status} onChange={e => setUpdateForm({ ...updateForm, status: e.target.value })} />
+            <Input label="Actual Quantity" type="number" min="0" placeholder={`Planned: ${selectedPlan.planned_quantity}`} value={updateForm.actual_quantity} onChange={e => setUpdateForm({ ...updateForm, actual_quantity: e.target.value })} />
+          </div>
+        )}
+      </Modal>
 
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create JIT Plan" size="md"
         footer={<><Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button><Button onClick={handleCreate} disabled={submitting}>{submitting ? 'Creating…' : 'Create Plan'}</Button></>}

@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { cached, cacheDel } from '@/lib/cache'
 import type { JITPlan, Product, Profile } from '@/types'
+import * as mock from '@/lib/mock-services'
+const MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
 type ProductRow = Pick<Product, 'id' | 'sku' | 'name' | 'category' | 'unit'>
 type UserRow = Pick<Profile, 'id' | 'full_name' | 'email'>
@@ -32,6 +34,7 @@ async function enrichPlans(rows: JITPlan[]): Promise<JITPlan[]> {
 }
 
 export async function getJITPlans(): Promise<JITPlan[]> {
+  if (MOCK) return mock.getJITPlans()
   return cached('jit-plans', async () => {
     const { data, error } = await supabase
       .from('cpaz_jit_plans')
@@ -49,6 +52,7 @@ export async function createJITPlan(payload: {
   notes?: string
   created_by: string
 }): Promise<JITPlan> {
+  if (MOCK) return mock.createJITPlan(payload)
   const { data, error } = await supabase
     .from('cpaz_jit_plans')
     .insert({ ...payload, status: 'pending', updated_at: new Date().toISOString() })
@@ -65,6 +69,7 @@ export async function updateJITPlan(id: string, payload: {
   actual_quantity?: number
   notes?: string
 }): Promise<void> {
+  if (MOCK) return mock.updateJITPlan(id, payload)
   const { error } = await supabase
     .from('cpaz_jit_plans')
     .update({ ...payload, updated_at: new Date().toISOString() })
@@ -74,6 +79,7 @@ export async function updateJITPlan(id: string, payload: {
 }
 
 export async function deleteJITPlan(id: string): Promise<void> {
+  if (MOCK) return mock.deleteJITPlan(id)
   const { error } = await supabase.from('cpaz_jit_plans').delete().eq('id', id)
   if (error) throw error
   cacheDel('jit-plans')

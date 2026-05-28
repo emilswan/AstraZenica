@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { cached, cacheDel } from '@/lib/cache'
 import type { Batch, BatchStatus, Product, Profile } from '@/types'
+import * as mock from '@/lib/mock-services'
+const MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
 type ProductRow = Pick<Product, 'id' | 'sku' | 'name' | 'category' | 'unit'>
 type UserRow = Pick<Profile, 'id' | 'full_name' | 'email' | 'role'>
@@ -32,6 +34,7 @@ async function enrichBatches(rows: Batch[]): Promise<Batch[]> {
 }
 
 export async function getBatches(): Promise<Batch[]> {
+  if (MOCK) return mock.getBatches()
   return cached('batches', async () => {
     const { data, error } = await supabase
       .from('cpaz_batches')
@@ -50,6 +53,7 @@ export async function createBatch(payload: {
   operator_id?: string
   notes?: string
 }): Promise<Batch> {
+  if (MOCK) return mock.createBatch(payload)
   const batchNumber = `BAT-${new Date().getFullYear()}-${Date.now().toString().slice(-5)}`
   const { data, error } = await supabase
     .from('cpaz_batches')
@@ -68,6 +72,7 @@ export async function updateBatch(id: string, payload: {
   notes?: string
   end_date?: string
 }): Promise<void> {
+  if (MOCK) return mock.updateBatch(id, payload)
   const { error } = await supabase
     .from('cpaz_batches')
     .update({ ...payload, updated_at: new Date().toISOString() })

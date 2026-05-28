@@ -9,7 +9,7 @@ import { Input, Select, Textarea } from '@/components/ui/Input'
 import { InspectionStatusBadge } from '@/components/ui/Badge'
 import { StatsCard } from '@/components/ui/StatsCard'
 import { formatDate, formatDateTime, timeAgo, cn } from '@/lib/utils'
-import { getInspections, createInspection } from '@/lib/services/inspections'
+import { getInspections, createInspection, updateInspection } from '@/lib/services/inspections'
 import { getProducts } from '@/lib/services/products'
 import { getBatches } from '@/lib/services/batches'
 import { cacheDel } from '@/lib/cache'
@@ -36,6 +36,8 @@ export default function InspectionPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [editFindings, setEditFindings] = useState('')
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     product_id: '', batch_id: '', type: 'incoming' as InspectionType, findings: '',
@@ -159,6 +161,9 @@ export default function InspectionPage() {
           <div className="sm:w-44">
             <Select options={[{ label: 'All Types', value: '' }, { label: 'Incoming', value: 'incoming' }, { label: 'In-Process', value: 'in_process' }, { label: 'Final', value: 'final' }, { label: 'Periodic', value: 'periodic' }]} value={typeFilter} onChange={e => setTypeFilter(e.target.value)} placeholder="All Types" />
           </div>
+          {(search || statusFilter || typeFilter) && (
+            <Button variant="outline" size="sm" onClick={() => { setSearch(''); setStatusFilter(''); setTypeFilter('') }}>Clear</Button>
+          )}
         </div>
       </Card>
 
@@ -192,7 +197,7 @@ export default function InspectionPage() {
                     <td className="py-3 px-4 text-slate-500">{insp.checked_at ? formatDateTime(insp.checked_at) : '—'}</td>
                     <td className="py-3 px-4 text-slate-500">{timeAgo(insp.created_at)}</td>
                     <td className="py-3 px-4">
-                      <button onClick={() => setSelectedInspection(insp)} className="text-xs text-blue-600 hover:text-blue-700 font-medium">Details</button>
+                      <button onClick={() => { setSelectedInspection(insp); setEditFindings(insp.findings || '') }} className="text-xs text-blue-600 hover:text-blue-700 font-medium">Details</button>
                     </td>
                   </tr>
                 )
@@ -215,7 +220,30 @@ export default function InspectionPage() {
 
       {selectedInspection && (
         <Modal isOpen={!!selectedInspection} onClose={() => setSelectedInspection(null)} title="Inspection Details" size="md"
-          footer={<Button variant="outline" onClick={() => setSelectedInspection(null)}>Close</Button>}
+          footer={
+            <div className="flex gap-2 w-full">
+              <Button variant="outline" onClick={() => setSelectedInspection(null)}>Close</Button>
+              <Button
+                disabled={!!updatingId}
+                onClick={async () => {
+                  if (!selectedInspection) return
+                  setUpdatingId(selectedInspection.id)
+                  try {
+                    await updateInspection(selectedInspection.id, {
+                      findings: editFindings || undefined,
+                      checked_at: ['passed', 'failed'].includes(selectedInspection.status) ? (selectedInspection.checked_at || new Date().toISOString()) : undefined,
+                    })
+                    setInspections(prev => prev.map(i => i.id === selectedInspection.id ? { ...i, findings: editFindings || undefined } : i))
+                    toast.success('Inspection updated')
+                    setSelectedInspection(null)
+                  } catch { toast.error('Failed to update') }
+                  finally { setUpdatingId(null) }
+                }}
+              >
+                {updatingId ? 'Saving…' : 'Save Changes'}
+              </Button>
+            </div>
+          }
         >
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -223,19 +251,56 @@ export default function InspectionPage() {
                 { label: 'Product', value: <><p className="mt-1 font-semibold text-slate-900">{selectedInspection.product?.name}</p><p className="text-xs text-slate-500">{selectedInspection.product?.sku}</p></> },
                 { label: 'Batch', value: <p className="mt-1 font-mono text-slate-700">{selectedInspection.batch?.batch_number || '—'}</p> },
                 { label: 'Type', value: <span className={cn('mt-1 inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', typeConfig[selectedInspection.type].color)}>{typeConfig[selectedInspection.type].label}</span> },
-                { label: 'Status', value: <div className="mt-1"><InspectionStatusBadge status={selectedInspection.status} /></div> },
                 { label: 'Inspector', value: <p className="mt-1 text-slate-700">{selectedInspection.inspector?.full_name || '—'}</p> },
                 { label: 'Checked At', value: <p className="mt-1 text-slate-700">{selectedInspection.checked_at ? formatDateTime(selectedInspection.checked_at) : '—'}</p> },
               ].map(item => (
                 <div key={item.label}><p className="text-xs text-slate-400 uppercase tracking-wide">{item.label}</p>{item.value}</div>
               ))}
             </div>
-            {selectedInspection.findings && (
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Findings</p>
-                <p className="text-sm text-slate-700 bg-gray-50 rounded-xl p-3 leading-relaxed">{selectedInspection.findings}</p>
+
+            {/* Status update */}
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">Update Status</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(['pending', 'in_progress', 'passed', 'failed', 'on_hold'] as InspectionStatus[]).map(s => (
+                  <button
+                    key={s}
+                    disabled={selectedInspection.status === s || !!updatingId}
+                    onClick={async () => {
+                      setUpdatingId(selectedInspection.id)
+                      try {
+                        const checkedAt = ['passed', 'failed'].includes(s) ? new Date().toISOString() : undefined
+                        await updateInspection(selectedInspection.id, { status: s, checked_at: checkedAt })
+                        setInspections(prev => prev.map(i => i.id === selectedInspection.id ? { ...i, status: s, checked_at: checkedAt || i.checked_at } : i))
+                        setSelectedInspection(prev => prev ? { ...prev, status: s } : null)
+                        toast.success(`Status → ${s.replace('_', ' ')}`)
+                      } catch { toast.error('Failed') }
+                      finally { setUpdatingId(null) }
+                    }}
+                    className={cn(
+                      'px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all',
+                      selectedInspection.status === s
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-slate-500 border-gray-200 hover:border-blue-300 hover:text-blue-600'
+                    )}
+                  >
+                    {s.replace('_', ' ')}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
+
+            {/* Findings edit */}
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Findings</p>
+              <textarea
+                value={editFindings}
+                onChange={e => setEditFindings(e.target.value)}
+                rows={4}
+                placeholder="Enter inspection findings..."
+                className="w-full text-sm text-slate-700 bg-gray-50 rounded-xl p-3 leading-relaxed border border-gray-200 focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none"
+              />
+            </div>
           </div>
         </Modal>
       )}

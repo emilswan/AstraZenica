@@ -130,6 +130,9 @@ export default function ProductsPage() {
           <div className="sm:w-52">
             <Select options={[{ label: 'All Categories', value: '' }, ...categories.map(c => ({ label: c, value: c }))]} value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} placeholder="All Categories" />
           </div>
+          {(search || categoryFilter) && (
+            <Button variant="outline" size="sm" onClick={() => { setSearch(''); setCategoryFilter('') }}>Clear</Button>
+          )}
         </div>
       </Card>
 
@@ -210,7 +213,16 @@ export default function ProductsPage() {
           </div>
           <Textarea label="Description" placeholder="Product description..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Category *" placeholder="e.g. Antibiotics" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} />
+            <Select
+              label="Category *"
+              options={[
+                ...categories.map(c => ({ label: c, value: c })),
+                { label: '+ Other (type below)', value: '__other__' },
+              ]}
+              placeholder="Select category"
+              value={categories.includes(form.category) ? form.category : (form.category ? '__other__' : '')}
+              onChange={e => setForm({ ...form, category: e.target.value === '__other__' ? '' : e.target.value })}
+            />
             <Select label="Unit" options={[{ label: 'Tablets', value: 'tablets' }, { label: 'Capsules', value: 'capsules' }, { label: 'Vials', value: 'vials' }, { label: 'Ampoules', value: 'ampoules' }, { label: 'Bottles', value: 'bottles' }, { label: 'Units', value: 'units' }]} value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} />
           </div>
           <div className="grid grid-cols-3 gap-4">

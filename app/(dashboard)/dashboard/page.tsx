@@ -117,10 +117,10 @@ export default function DashboardPage() {
   ]
 
   const kpiCards = [
-    { label: 'Active Orders',   value: loaded ? activeOrders          : null, icon: Activity,    color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-100' },
-    { label: 'In Production',   value: loaded ? kpis?.activeBatches   : null, icon: Zap,         color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100' },
-    { label: 'Low Stock Items', value: loaded ? lowStock               : null, icon: TrendingUp,  color: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-100' },
-    { label: 'Delayed Orders',  value: loaded ? lateShipments         : null, icon: Clock,       color: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-100' },
+    { label: 'Active Orders',   value: loaded ? activeOrders          : undefined, icon: Activity,    color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-100' },
+    { label: 'In Production',   value: loaded ? kpis?.activeBatches   : undefined, icon: Zap,         color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100' },
+    { label: 'Low Stock Items', value: loaded ? lowStock               : undefined, icon: TrendingUp,  color: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-100' },
+    { label: 'Delayed Orders',  value: loaded ? lateShipments         : undefined, icon: Clock,       color: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-100' },
   ]
 
   return (
@@ -164,7 +164,7 @@ export default function DashboardPage() {
                   <div key={k.label} className={`flex flex-col items-center justify-center gap-1.5 px-3 py-3 rounded-xl border ${k.bg} ${k.border} w-full sm:w-24`}>
                     <Icon className={`h-4 w-4 ${k.color} flex-shrink-0`} />
                     <p className={`text-lg font-extrabold leading-none ${k.color}`}>
-                      {k.value === null ? <span className="inline-block h-5 w-7 bg-current opacity-20 rounded animate-pulse" /> : k.value}
+                      {k.value === undefined ? <span className="inline-block h-5 w-7 bg-current opacity-20 rounded animate-pulse" /> : k.value}
                     </p>
                     <p className="text-[9px] text-slate-400 font-semibold text-center leading-tight">{k.label}</p>
                   </div>
@@ -218,7 +218,7 @@ export default function DashboardPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-extrabold text-slate-900 leading-tight">{tile.label}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] text-slate-400">{tile.stat}</span>
+                      {!loaded ? <span className="inline-block h-3 w-12 bg-slate-200 rounded animate-pulse" /> : <span className="text-[10px] text-slate-400">{tile.stat}</span>}
                       {tile.alert && <span className={`text-[10px] font-bold ${tile.alertColor}`}>· {tile.alert}</span>}
                     </div>
                   </div>
@@ -259,7 +259,10 @@ export default function DashboardPage() {
 
                     {/* Live stat on gradient */}
                     <div className="relative z-10">
-                      <p className="text-white/70 text-[10px] font-semibold mb-0.5">{tile.stat}</p>
+                      {!loaded
+                        ? <span className="inline-block h-3 w-14 bg-white/30 rounded animate-pulse mb-0.5" />
+                        : <p className="text-white/70 text-[10px] font-semibold mb-0.5">{tile.stat}</p>
+                      }
                       {tile.alert && (
                         <p className="text-white text-[10px] font-bold flex items-center gap-1">
                           <AlertTriangle className="h-2.5 w-2.5" /> {tile.alert}

@@ -1,14 +1,15 @@
 'use client'
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, Archive, AlertTriangle, CheckCircle, TrendingUp, RefreshCw } from 'lucide-react'
+import { Search, Archive, AlertTriangle, CheckCircle, TrendingUp, RefreshCw, Edit2, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Modal } from '@/components/ui/Modal'
 import { Input, Select } from '@/components/ui/Input'
 import { BufferHealthBadge } from '@/components/ui/Badge'
 import { StatsCard } from '@/components/ui/StatsCard'
 import { formatDate, formatNumber, cn } from '@/lib/utils'
-import { getBufferStock } from '@/lib/services/buffer-stock'
+import { getBufferStock, updateBufferStock } from '@/lib/services/buffer-stock'
 import { cacheDel } from '@/lib/cache'
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay'
 import toast from 'react-hot-toast'
@@ -34,6 +35,9 @@ export default function BufferStockPage() {
   const [healthFilter, setHealthFilter] = useState('')
   const [locationFilter, setLocationFilter] = useState('')
   const [loadingMsg, setLoadingMsg] = useState('')
+  const [editItem, setEditItem] = useState<BufferStock | null>(null)
+  const [editForm, setEditForm] = useState({ current_level: '', minimum_level: '', target_level: '' })
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   const loadData = useCallback(async (msg = 'Loading buffer stock...') => {
     setLoadingMsg(msg)
@@ -52,6 +56,24 @@ export default function BufferStockPage() {
   function handleRefresh() {
     cacheDel('buffer-stock')
     loadData('Refreshing buffer stock...')
+  }
+
+  async function handleUpdateLevels() {
+    if (!editItem) return
+    setUpdatingId(editItem.id)
+    try {
+      const payload = {
+        current_level: editForm.current_level ? Number(editForm.current_level) : editItem.current_level,
+        minimum_level: editForm.minimum_level ? Number(editForm.minimum_level) : editItem.minimum_level,
+        target_level: editForm.target_level ? Number(editForm.target_level) : editItem.target_level,
+        last_reviewed: new Date().toISOString().split('T')[0],
+      }
+      await updateBufferStock(editItem.id, payload)
+      setBufferStock(prev => prev.map(b => b.id === editItem.id ? { ...b, ...payload } : b))
+      toast.success('Buffer levels updated')
+      setEditItem(null)
+    } catch { toast.error('Failed to update') }
+    finally { setUpdatingId(null) }
   }
 
   const filtered = useMemo(() => bufferStock.filter(b => {
@@ -119,6 +141,9 @@ export default function BufferStockPage() {
           <div className="sm:w-48">
             <Select options={[{ label: 'All Locations', value: '' }, ...locations.map(l => ({ label: l, value: l }))]} value={locationFilter} onChange={e => setLocationFilter(e.target.value)} placeholder="All Locations" />
           </div>
+          {(search || healthFilter || locationFilter) && (
+            <Button variant="outline" size="sm" onClick={() => { setSearch(''); setHealthFilter(''); setLocationFilter('') }}>Clear</Button>
+          )}
         </div>
       </Card>
 
@@ -171,17 +196,42 @@ export default function BufferStockPage() {
 
               <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
                 <span>Last reviewed: {formatDate(b.last_reviewed) || '—'}</span>
-                {b.current_level < b.minimum_level && (
-                  <span className="text-red-600 font-semibold flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" />Reorder needed
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {b.current_level < b.minimum_level && (
+                    <span className="text-red-600 font-semibold flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Reorder {formatNumber(b.target_level - b.current_level)} units
+                    </span>
+                  )}
+                  <button
+                    onClick={() => { setEditItem(b); setEditForm({ current_level: String(b.current_level), minimum_level: String(b.minimum_level), target_level: String(b.target_level) }) }}
+                    className="flex items-center gap-1 text-slate-500 hover:text-violet-600 font-semibold transition-colors"
+                  >
+                    <Edit2 className="h-3 w-3" />Edit
+                  </button>
+                </div>
               </div>
             </Card>
           )
         })}
         {filtered.length === 0 && <div className="col-span-2 text-center py-12 text-slate-400">No buffer stock entries found</div>}
       </div>
+
+      <Modal isOpen={!!editItem} onClose={() => setEditItem(null)} title="Update Buffer Levels" size="sm"
+        footer={<><Button variant="outline" onClick={() => setEditItem(null)}>Cancel</Button><Button onClick={handleUpdateLevels} disabled={!!updatingId}>{updatingId ? 'Saving…' : 'Update Levels'}</Button></>}
+      >
+        {editItem && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-xl p-3 text-sm">
+              <p className="font-semibold text-slate-800">{editItem.product?.name}</p>
+              <p className="text-xs text-slate-400">{editItem.location}</p>
+            </div>
+            <Input label="Current Level" type="number" min="0" value={editForm.current_level} onChange={e => setEditForm({ ...editForm, current_level: e.target.value })} hint="Actual units currently in stock" />
+            <Input label="Minimum Level" type="number" min="0" value={editForm.minimum_level} onChange={e => setEditForm({ ...editForm, minimum_level: e.target.value })} hint="Alert triggers below this level" />
+            <Input label="Target Level" type="number" min="0" value={editForm.target_level} onChange={e => setEditForm({ ...editForm, target_level: e.target.value })} hint="Ideal replenishment target" />
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

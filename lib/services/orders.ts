@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { cached, cacheDel } from '@/lib/cache'
 import type { Order, OrderStatus, OrderPriority, Profile } from '@/types'
+import * as mock from '@/lib/mock-services'
+const MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
 type UserRow = Pick<Profile, 'id' | 'email' | 'full_name' | 'role' | 'department'>
 
@@ -16,6 +18,7 @@ async function enrichOrders(rows: Order[]): Promise<Order[]> {
 }
 
 export async function getOrders(): Promise<Order[]> {
+  if (MOCK) return mock.getOrders()
   return cached('orders', async () => {
     const { data, error } = await supabase
       .from('cpaz_orders')
@@ -33,6 +36,7 @@ export async function createOrder(payload: {
   notes?: string
   total_value?: number
 }): Promise<Order> {
+  if (MOCK) return mock.createOrder(payload)
   const { data, error } = await supabase
     .from('cpaz_orders')
     .insert({ ...payload, updated_at: new Date().toISOString() })
@@ -45,6 +49,7 @@ export async function createOrder(payload: {
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {
+  if (MOCK) return mock.updateOrderStatus(id, status)
   const { error } = await supabase
     .from('cpaz_orders')
     .update({ status, updated_at: new Date().toISOString() })
@@ -54,6 +59,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
 }
 
 export async function deleteOrder(id: string): Promise<void> {
+  if (MOCK) return mock.deleteOrder(id)
   const { error } = await supabase.from('cpaz_orders').delete().eq('id', id)
   if (error) throw error
   cacheDel('orders', 'kpis', 'order-status-chart', 'orders-trend')

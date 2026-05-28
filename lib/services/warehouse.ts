@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { cached, cacheDel } from '@/lib/cache'
 import type { WarehouseOp, WarehouseOpType, Product, Profile } from '@/types'
+import * as mock from '@/lib/mock-services'
+const MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
 type ProductRow = Pick<Product, 'id' | 'sku' | 'name' | 'category' | 'unit'>
 type UserRow = Pick<Profile, 'id' | 'full_name' | 'email'>
@@ -32,6 +34,7 @@ async function enrichOps(rows: WarehouseOp[]): Promise<WarehouseOp[]> {
 }
 
 export async function getWarehouseOps(): Promise<WarehouseOp[]> {
+  if (MOCK) return mock.getWarehouseOps()
   return cached('warehouse-ops', async () => {
     const { data, error } = await supabase
       .from('cpaz_warehouse_ops')
@@ -52,6 +55,7 @@ export async function createWarehouseOp(payload: {
   reference_number?: string
   notes?: string
 }): Promise<WarehouseOp> {
+  if (MOCK) return mock.createWarehouseOp(payload)
   const { data, error } = await supabase
     .from('cpaz_warehouse_ops')
     .insert({ ...payload, status: 'pending', updated_at: new Date().toISOString() })
@@ -64,6 +68,7 @@ export async function createWarehouseOp(payload: {
 }
 
 export async function updateWarehouseOpStatus(id: string, status: WarehouseOp['status']): Promise<void> {
+  if (MOCK) return mock.updateWarehouseOpStatus(id, status)
   const { error } = await supabase
     .from('cpaz_warehouse_ops')
     .update({ status, updated_at: new Date().toISOString() })

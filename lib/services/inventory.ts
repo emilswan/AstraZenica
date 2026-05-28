@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { cached, cacheDel } from '@/lib/cache'
 import type { InventoryItem, Product } from '@/types'
+import * as mock from '@/lib/mock-services'
+const MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
 type ProductRow = Pick<Product, 'id' | 'sku' | 'name' | 'category' | 'unit' | 'min_stock' | 'reorder_point' | 'unit_price'>
 
@@ -14,6 +16,7 @@ async function fetchProductMap(): Promise<Record<string, ProductRow>> {
 }
 
 export async function getInventory(): Promise<InventoryItem[]> {
+  if (MOCK) return mock.getInventory()
   return cached('inventory', async () => {
     const [{ data: invData, error }, productMap] = await Promise.all([
       supabase.from('cpaz_inventory').select('*').order('created_at', { ascending: false }),
@@ -32,6 +35,7 @@ export async function createInventoryItem(payload: {
   expiry_date?: string
   status?: InventoryItem['status']
 }): Promise<InventoryItem> {
+  if (MOCK) return mock.createInventoryItem(payload)
   const { data, error } = await supabase
     .from('cpaz_inventory')
     .insert({ ...payload, updated_at: new Date().toISOString() })
@@ -48,6 +52,7 @@ export async function createInventoryItem(payload: {
 }
 
 export async function updateInventoryItem(id: string, payload: Partial<InventoryItem>): Promise<void> {
+  if (MOCK) return mock.updateInventoryItem(id, payload)
   const { error } = await supabase
     .from('cpaz_inventory')
     .update({ ...payload, updated_at: new Date().toISOString() })

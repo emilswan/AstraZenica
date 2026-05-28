@@ -20,35 +20,43 @@ interface TrackingStep {
 }
 
 function buildSteps(order: Order): TrackingStep[] {
-  const statuses = ['pending', 'approved', 'processing', 'shipped', 'delivered']
-  const ci = statuses.indexOf(order.status)
   const ts = formatDateTime(order.updated_at)
-
-  // Build metadata from actual order data
   const requester = order.requester?.full_name || 'Unknown'
   const deliverBy = formatDate(order.deliver_by) || 'TBD'
   const orderValue = order.total_value ? `$${order.total_value.toLocaleString()}` : '—'
-  const orderNotes = order.notes || ''
+
+  // Maps order status → step index that is currently active
+  const activeStepMap: Record<string, number> = {
+    pending: 0,
+    approved: 1,
+    processing: 2,
+    shipped: 3,
+    delivered: 4,
+    cancelled: -1,
+  }
+  const activeStep = activeStepMap[order.status] ?? 0
 
   const steps: Omit<TrackingStep, 'status' | 'time'>[] = [
     { label: 'Order Placed', desc: 'Submitted & awaiting approval', actor: requester, meta: [`Priority: ${order.priority}`, `Deliver by: ${deliverBy}`, `Value: ${orderValue}`], icon: Package },
-    { label: 'Pick', desc: 'Items picked from warehouse', actor: requester, meta: orderNotes ? [orderNotes.split('\n')[0]] : undefined, icon: User },
-    { label: 'Quality Inspection', desc: 'QC check completed', actor: undefined, meta: ['CofA attached', 'No Damage'], icon: ShieldCheck },
-    { label: 'Dispatch', desc: 'Loaded and dispatched', actor: undefined, meta: undefined, icon: Warehouse },
-    { label: 'On Route', desc: 'Driver en route to destination', actor: undefined, meta: undefined, icon: Truck },
-    { label: 'Delivered', desc: 'Order delivered to recipient', actor: undefined, meta: undefined, icon: CheckCircle },
+    { label: 'Approved & Picking', desc: 'Order approved, items being picked from warehouse', actor: requester, meta: undefined, icon: User },
+    { label: 'Quality Inspection', desc: 'QC check & certificate of analysis review', actor: undefined, meta: ['CofA verified', 'No damage reported'], icon: ShieldCheck },
+    { label: 'Dispatched', desc: 'Loaded onto vehicle and dispatched', actor: undefined, meta: undefined, icon: Truck },
+    { label: 'Delivered', desc: 'Order received by recipient', actor: undefined, meta: undefined, icon: CheckCircle },
   ]
 
-  const map: Record<string, number> = { pending: 0, approved: 1, processing: 2, shipped: 3, delivered: 5 }
-
-  return steps.map((step, idx) => {
-    const si = idx <= 3 ? idx : idx === 4 ? 3 : 5
-    return {
+  if (order.status === 'cancelled') {
+    return steps.map((step, idx) => ({
       ...step,
-      status: si < ci ? 'completed' : si === ci ? 'active' : 'pending',
-      time: si <= ci ? ts : undefined,
-    }
-  })
+      status: idx === 0 ? 'blocked' : 'pending' as TrackingStep['status'],
+      time: idx === 0 ? ts : undefined,
+    }))
+  }
+
+  return steps.map((step, idx) => ({
+    ...step,
+    status: (idx < activeStep ? 'completed' : idx === activeStep ? 'active' : 'pending') as TrackingStep['status'],
+    time: idx <= activeStep ? ts : undefined,
+  }))
 }
 
 function progressPercent(order: Order): number {
@@ -98,7 +106,7 @@ export default function TrackingPage() {
 
       {/* Filter tabs */}
       <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {['all', 'pending', 'processing', 'shipped', 'delivered'].map(f => (
+        {['all', 'pending', 'approved', 'processing', 'shipped', 'delivered', 'cancelled'].map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}

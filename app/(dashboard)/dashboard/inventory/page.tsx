@@ -115,11 +115,14 @@ export default function InventoryPage() {
           <input placeholder="Search items, SKU, batch..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-violet-500" />
         </div>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 bg-white focus:ring-1 focus:ring-violet-500">
-          <option value="">All</option>
+          <option value="">All Status</option>
           <option value="available">Available</option>
           <option value="reserved">Reserved</option>
           <option value="quarantine">Quarantine</option>
         </select>
+        {(search || statusFilter) && (
+          <button onClick={() => { setSearch(''); setStatusFilter('') }} className="text-xs text-slate-500 hover:text-violet-600 font-semibold px-2 border border-gray-200 rounded-lg bg-white h-8">Clear</button>
+        )}
       </div>
 
       {/* Two-column layout: Table + Detail Panel */}
@@ -167,9 +170,13 @@ export default function InventoryPage() {
                     <td className="py-2 px-3"><StatusPill level={level} /></td>
                     <td className="py-2 px-3 text-slate-500">{item.location}</td>
                     <td className="py-2 px-3">
-                      <span className={cn(expSoon ? 'text-amber-600 font-semibold' : 'text-slate-500')}>
-                        {formatDate(item.expiry_date)}{expSoon && ' ⚠'}
-                      </span>
+                      {expSoon ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[10px] font-semibold">
+                          <AlertTriangle className="h-3 w-3" />{formatDate(item.expiry_date)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-xs">{formatDate(item.expiry_date) || '—'}</span>
+                      )}
                     </td>
                     <td className="py-2 px-3">
                       <button onClick={() => router.push('/dashboard/orders')} className="pill bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors cursor-pointer text-[10px]">Order</button>

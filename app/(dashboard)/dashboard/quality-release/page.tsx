@@ -22,29 +22,50 @@ interface QCItem {
   expiryDate: string
 }
 
-/** Build QC items from real inventory data linked to this order's products */
-function buildQCItemsFromInventory(inventory: InventoryItem[]): QCItem[] {
-  // Group by product, take first batch per product
+/** Parse SKUs mentioned in order notes (format: "Name (SKU) xQty") */
+function parseOrderSkus(notes?: string): string[] {
+  if (!notes) return []
+  const matches = notes.match(/\(([^)]+)\)/g) || []
+  return matches.map(m => m.slice(1, -1)).filter(Boolean)
+}
+
+/** Build QC items from inventory items relevant to the selected order */
+function buildQCItemsForOrder(order: Order, inventory: InventoryItem[]): QCItem[] {
+  const orderSkus = parseOrderSkus(order.notes)
   const seen = new Set<string>()
   const items: QCItem[] = []
 
-  for (const inv of inventory) {
-    const pid = inv.product_id
-    if (!pid || seen.has(pid) || !inv.product) continue
-    seen.add(pid)
-    items.push({
-      id: inv.id,
-      name: inv.product.name || 'Unknown Product',
-      sku: inv.product.sku || '',
-      qty: inv.quantity,
-      unit: inv.product.unit || 'units',
-      checked: false,
-      damaged: false,
-      batchNumber: inv.batch_number || '—',
-      expiryDate: inv.expiry_date || '—',
-    })
-    if (items.length >= 6) break
+  // First pass: items matching this order's SKUs (structured orders from Place Order page)
+  if (orderSkus.length > 0) {
+    for (const inv of inventory) {
+      if (!inv.product || seen.has(inv.product_id)) continue
+      if (orderSkus.includes(inv.product.sku)) {
+        seen.add(inv.product_id)
+        items.push({
+          id: inv.id, name: inv.product.name, sku: inv.product.sku,
+          qty: inv.quantity, unit: inv.product.unit || 'units',
+          checked: false, damaged: false,
+          batchNumber: inv.batch_number || '—', expiryDate: inv.expiry_date || '—',
+        })
+      }
+    }
   }
+
+  // Fallback: show available inventory items (for orders without structured notes)
+  if (items.length === 0) {
+    for (const inv of inventory) {
+      if (!inv.product || seen.has(inv.product_id) || inv.status === 'quarantine') continue
+      seen.add(inv.product_id)
+      items.push({
+        id: inv.id, name: inv.product.name, sku: inv.product.sku,
+        qty: inv.quantity, unit: inv.product.unit || 'units',
+        checked: false, damaged: false,
+        batchNumber: inv.batch_number || '—', expiryDate: inv.expiry_date || '—',
+      })
+      if (items.length >= 6) break
+    }
+  }
+
   return items
 }
 
@@ -69,8 +90,7 @@ export default function QualityReleasePage() {
       if (delivered.length) {
         const first = delivered[0]
         setSelectedOrder(first)
-        setItems(buildQCItemsFromInventory(inv))
-        // Pre-fill label with requester info
+        setItems(buildQCItemsForOrder(first, inv))
         setLabelTo(first.requester?.full_name || '')
       }
     } catch { toast.error('Failed to load data') }
@@ -81,7 +101,7 @@ export default function QualityReleasePage() {
 
   function selectOrder(order: Order) {
     setSelectedOrder(order)
-    setItems(buildQCItemsFromInventory(inventory))
+    setItems(buildQCItemsForOrder(order, inventory))
     setLabelTo(order.requester?.full_name || '')
   }
 

@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { cached, cacheDel } from '@/lib/cache'
 import type { BufferStock, Product } from '@/types'
+import * as mock from '@/lib/mock-services'
+const MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
 type ProductRow = Pick<Product, 'id' | 'sku' | 'name' | 'category' | 'unit'>
 
@@ -29,6 +31,7 @@ async function enrichBufferStock(rows: BufferStock[]): Promise<BufferStock[]> {
 }
 
 export async function getBufferStock(): Promise<BufferStock[]> {
+  if (MOCK) return mock.getBufferStock()
   return cached('buffer-stock', async () => {
     const { data, error } = await supabase
       .from('cpaz_buffer_stock')
@@ -46,6 +49,7 @@ export async function updateBufferStock(id: string, payload: {
   location?: string
   last_reviewed?: string
 }): Promise<void> {
+  if (MOCK) return mock.updateBufferStock(id, payload)
   const { error } = await supabase
     .from('cpaz_buffer_stock')
     .update({ ...payload, updated_at: new Date().toISOString() })
@@ -61,6 +65,7 @@ export async function createBufferStock(payload: {
   current_level: number
   location: string
 }): Promise<BufferStock> {
+  if (MOCK) return mock.createBufferStock(payload)
   const { data, error } = await supabase
     .from('cpaz_buffer_stock')
     .insert({ ...payload, last_reviewed: new Date().toISOString().split('T')[0], updated_at: new Date().toISOString() })

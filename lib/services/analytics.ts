@@ -1,8 +1,11 @@
 import { supabase } from '@/lib/supabase'
 import { cached } from '@/lib/cache'
 import type { KPIStats, OrderStatusChart, CategoryChartData } from '@/types'
+import * as mock from '@/lib/mock-services'
+const MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
 export async function getDashboardKPIs(): Promise<KPIStats> {
+  if (MOCK) return mock.getDashboardKPIs()
   return cached('kpis', async () => {
     const [r1, r2, r3] = await Promise.all([
       supabase.from('cpaz_orders').select('*', { count: 'exact', head: true }),
@@ -47,6 +50,7 @@ export async function getDashboardKPIs(): Promise<KPIStats> {
 }
 
 export async function getOrderStatusChart(): Promise<OrderStatusChart[]> {
+  if (MOCK) return mock.getOrderStatusChart()
   return cached('order-status-chart', async () => {
     const { data, error } = await supabase.from('cpaz_orders').select('status')
     if (error) throw error
@@ -65,6 +69,7 @@ export async function getOrderStatusChart(): Promise<OrderStatusChart[]> {
 }
 
 export async function getInventoryByCategory(): Promise<CategoryChartData[]> {
+  if (MOCK) return mock.getInventoryByCategory()
   return cached('inventory-by-category', async () => {
     const [{ data: inventoryData, error: invError }, { data: productsData, error: prodError }] = await Promise.all([
       supabase.from('cpaz_inventory').select('product_id, quantity'),
@@ -94,6 +99,7 @@ export async function getInventoryByCategory(): Promise<CategoryChartData[]> {
 }
 
 export async function getOrdersTrend(): Promise<{ date: string; value: number }[]> {
+  if (MOCK) return mock.getOrdersTrend()
   return cached('orders-trend', async () => {
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
@@ -112,6 +118,7 @@ export async function getOrdersTrend(): Promise<{ date: string; value: number }[
 }
 
 export async function getMonthlyData(): Promise<{ month: string; orders: number; revenue: number; batches: number }[]> {
+  if (MOCK) return mock.getMonthlyData()
   return cached('monthly-data', async () => {
     const sixMonthsAgo = new Date()
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
